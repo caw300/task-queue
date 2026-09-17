@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Task Queue Dashboard</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px;
+         background: #0f1117; color: #e6e6e6; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .sub { color: #888; font-size: 13px; margin-bottom: 20px; }
+  .stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat { background: #1a1d27; border-radius: 10px; padding: 14px 20px; min-width: 110px; }
+  .stat .n { font-size: 26px; font-weight: 700; }
+  .stat .label { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: .05em; }
+  .pending .n { color: #eab308; } .running .n { color: #3b82f6; }
+  .completed .n { color: #22c55e; } .failed .n { color: #ef4444; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #22252f; }
+  th { color: #999; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+  tr:hover { background: #171a23; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.pending { background: #3a2f0b; color: #eab308; }
+  .badge.running { background: #10203a; color: #3b82f6; }
+  .badge.completed { background: #0f2b18; color: #22c55e; }
+  .badge.failed { background: #2b0f0f; color: #ef4444; }
+  .mono { font-family: ui-monospace, monospace; color: #999; }
+</style>
+</head>
+<body>
+  <h1>Task Queue Dashboard</h1>
+  <div class="sub">Auto-refreshes every second</div>
+
+  <div class="stats" id="stats"></div>
+
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Task</th><th>Status</th><th>Priority</th><th>Attempt</th><th>Worker</th><th>Result / Error</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+<script>
+async function refresh() {
+  const [statsRes, tasksRes] = await Promise.all([
+    fetch('/stats').then(r => r.json()),
+    fetch('/tasks?limit=50').then(r => r.json())
+  ]);
+
+  const statEl = document.getElementById('stats');
+  statEl.innerHTML = ['pending','running','completed','failed'].map(s =>
+    `<div class="stat ${s}"><div class="n">${statsRes[s] ?? 0}</div><div class="label">${s}</div></div>`
+  ).join('');
+
+  const rows = document.getElementById('rows');
+  rows.innerHTML = tasksRes.map(t => `
+    <tr>
+      <td class="mono">${t.id.slice(0,8)}</td>
+      <td>${t.name}</td>
+      <td><span class="badge ${t.status}">${t.status}</span></td>
+      <td>${t.priority}</td>
+      <td>${t.retries + 1}/${t.max_retries + 1}</td>
+      <td class="mono">${t.worker_id ?? '—'}</td>
+      <td class="mono">${(t.status === 'failed' || t.status === 'pending' && t.error) ? (t.error ?? '').slice(0,60) : JSON.stringify(t.result ?? '')}</td>
+    </tr>
+  `).join('');
+}
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
